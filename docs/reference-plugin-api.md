@@ -199,6 +199,22 @@ the system first (see [README.md](/README.md#installation)):
 sh run.sh run.metta provider=Example
 ```
 
+### Processing LLM requests
+
+A plugin can change every request before it reaches the LLM provider, for
+example to compile the context into a token budget. Register a callable which
+takes `providers.LLMRequest` and returns the request to send:
+
+```python
+def loadOmegaPlugin():
+    providers.registerRequestProcessor("example", lambda request: request)
+```
+
+Processors run in registration order. Registering the same identifier again
+replaces the processor. If a processor raises an exception or returns
+something other than `LLMRequest`, the error is logged and the request is
+passed on unchanged.
+
 ## Other agent related APIs
 
 A plugin can dynamically add new skills or modify the agent's prompt if it is

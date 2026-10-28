@@ -242,10 +242,39 @@ def llmProviderStart(provider):
         raise RuntimeError(error)
     _llmprovider.start()
 
+_requestProcessors = {}
+
+def registerRequestProcessor(id, processor) -> None:
+    """
+    Register a request processor. Processors run in registration order before
+    each LLM call and return the request to send, e.g. to compile context.
+
+    Arguments:
+    id: the identifier of the processor, registering it again replaces it
+    processor: callable which takes LLMRequest and returns LLMRequest
+    """
+    global _requestProcessors
+    logger.info(f"registerRequestProcessor: registering request processor {id}")
+    _requestProcessors[id] = processor
+
+def _processRequest(request: LLMRequest) -> LLMRequest:
+    for id, processor in _requestProcessors.items():
+        try:
+            processed = processor(request)
+        except Exception:
+            logger.exception(f"Request processor {id} failed, request is passed unchanged")
+            continue
+        if not isinstance(processed, LLMRequest):
+            logger.error(f"Request processor {id} returned {type(processed).__name__}, request is passed unchanged")
+            continue
+        request = processed
+    return request
+
 def llmProviderChat(request):
     """Chat via selected LLM provider"""
     global _llmprovider
     try:
+        request = _processRequest(request)
         response = _llmprovider.chat(request)
         return _validate_response(request, response)
     except Exception:
