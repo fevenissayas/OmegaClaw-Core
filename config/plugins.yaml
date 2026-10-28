@@ -52,3 +52,7 @@
 - name: openclaw
   loader: metta
   location: "{REPO}/plugins/openclaw"
+
+- name: mindplex
+  loader: metta
+  location: "{REPO}/plugins/mindplex"
