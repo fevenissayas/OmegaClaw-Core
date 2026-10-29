@@ -1,10 +1,4 @@
-"""Bridge from the Python runtime to MeTTa skills running in PeTTa.
-
-PeTTa runs SWI-Prolog in this process (janus). Calls are serialized with a
-lock because the atomspace is shared state; a call that exceeds its timeout
-is reported to the model as failed, but the Prolog side cannot be
-interrupted and keeps the lock until it returns.
-"""
+"""Runs MeTTa skills in PeTTa for the Python runtime."""
 
 from dataclasses import dataclass
 import re
@@ -33,7 +27,7 @@ class MettaBridge:
         self._timeout = float(timeout_seconds)
 
     def eval(self, expression: str) -> list[str]:
-        """Evaluate one expression and return PeTTa's result strings."""
+        """Evaluates one expression and returns PeTTa's result strings."""
         with self._lock:
             return [str(result) for result in self._petta.process_metta_string(f"!{expression}")]
 
@@ -44,7 +38,7 @@ class MettaBridge:
         def run():
             try:
                 outcome["results"] = self.eval(expression)
-            except Exception as error:  # PeTTa raises janus errors for MeTTa failures
+            except Exception as error:
                 outcome["error"] = f"{type(error).__name__}: {error}"
 
         worker = threading.Thread(target=run, name=f"metta-{name}", daemon=True)
@@ -60,12 +54,12 @@ class MettaBridge:
         return ToolResult(True, value)
 
     def skill_lines(self) -> list[str]:
-        """Text lines of (getSkills), as listed for the model."""
+        """Returns the (getSkills) text lines."""
         return [line for result in self.eval("(getSkills)") for line in metta_strings(result)]
 
 
 def skill_expression(name: str, args) -> str:
-    """Build (name "arg" ...) with MeTTa string escaping."""
+    """Builds a (name "arg" ...) skill call with escaped arguments."""
     if not re.fullmatch(r"[A-Za-z][\w\-]*", name):
         raise ValueError(f"Invalid skill name: {name!r}")
     quoted = " ".join(metta_quote(str(arg)) for arg in args)
@@ -73,7 +67,7 @@ def skill_expression(name: str, args) -> str:
 
 
 def metta_text(results) -> str:
-    """Text of an evaluation result: a printed string literal is unquoted."""
+    """Returns a result's text, unquoting a single string literal."""
     text = "\n".join(str(result) for result in results)
     stripped = text.strip()
     if len(stripped) >= 2 and stripped[0] == '"' and stripped[-1] == '"':
@@ -88,7 +82,7 @@ def metta_quote(text: str) -> str:
 
 
 def metta_strings(text: str) -> list[str]:
-    """String literals in a printed MeTTa expression, unescaped."""
+    """Returns the unescaped string literals in a printed MeTTa expression."""
     values = []
     index = 0
     while index < len(text):

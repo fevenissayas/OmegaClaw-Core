@@ -1,10 +1,4 @@
-"""SQLite event log for agent tasks.
-
-A task is one user message and the agent run it starts. The runner saves
-the full model message history after every step, so a task interrupted by a
-restart resumes from its last completed step. Events (tool calls, results,
-errors) are append-only and are what evaluations read back.
-"""
+"""SQLite log of agent tasks and their events."""
 
 from dataclasses import dataclass
 import json
@@ -75,7 +69,7 @@ class EventStore:
             )
 
     def interrupted_task(self) -> Task | None:
-        """The newest task still marked running, e.g. after a crash."""
+        """Returns the newest task still marked running."""
         with self._lock:
             row = self._db.execute(
                 "SELECT id, message, status, history FROM tasks WHERE status = ? "

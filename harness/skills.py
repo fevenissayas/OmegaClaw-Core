@@ -1,10 +1,4 @@
-"""Typed tool specs parsed from the MeTTa skill catalogue.
-
-getSkills (src/skills.metta) returns one text line per skill, written as
-"- <description>: <name> <arg> <arg>", plus free-text rule lines. The
-runtime turns each skill line into a SkillSpec so the model gets one tool
-per skill with named string parameters; rule lines stay prompt text.
-"""
+"""Parses getSkills lines into typed tool specs."""
 
 from dataclasses import dataclass
 import re
@@ -22,12 +16,12 @@ class SkillSpec:
 
     @property
     def tool_name(self) -> str:
-        """Tool name accepted by LLM APIs (letters, digits, _ and -)."""
+        """Returns the skill name with characters LLM APIs reject replaced."""
         return _TOOL_NAME.sub("_", self.name)
 
 
 def parse_skill_lines(lines) -> tuple[tuple[SkillSpec, ...], tuple[str, ...]]:
-    """Split getSkills lines into skill specs and remaining rule lines."""
+    """Splits getSkills lines into skill specs and rule lines."""
     specs: dict[str, SkillSpec] = {}
     rules: list[str] = []
     for raw in lines:
@@ -39,7 +33,6 @@ def parse_skill_lines(lines) -> tuple[tuple[SkillSpec, ...], tuple[str, ...]]:
             continue
         name, *args = match.group("call").split()
         params = tuple(_unique_params(args))
-        # A later definition replaces an earlier one, like dynamic skills do.
         specs.pop(name, None)
         specs[name] = SkillSpec(name, match.group("description").strip(), params)
     return tuple(specs.values()), tuple(rules)

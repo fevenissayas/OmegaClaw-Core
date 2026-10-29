@@ -1,4 +1,4 @@
-"""Python runtime end to end with a scripted model (pydantic_ai FunctionModel)."""
+"""Tests the Python runtime end to end with a scripted model."""
 
 import pytest
 
@@ -42,7 +42,7 @@ def sections():
 
 
 class Skills:
-    """Fake MeTTa skills: records calls, answers websearch with numbered results."""
+    """Fakes MeTTa skills and records their calls."""
 
     def __init__(self, results=None):
         self.calls = []
@@ -58,7 +58,7 @@ class Skills:
 
 
 class Script:
-    """Model that plays scripted responses and records what it was sent."""
+    """Plays scripted model responses and records each request."""
 
     def __init__(self, *responses):
         self.responses = list(responses)
@@ -147,11 +147,9 @@ def test_latest_step_stays_native_and_older_results_become_evidence(tmp_path):
     runner.run_task("compare alpha and beta")
 
     second, third = script.seen[1], script.seen[2]
-    # Step 2: compiled head + the native c1 call and its return.
     assert isinstance(second[1], ModelResponse) and second[1].parts[0].tool_call_id == "c1"
     assert isinstance(second[2].parts[0], ToolReturnPart)
     assert sum("results for alpha" in text_of(m) for m in second) == 1
-    # Step 3: c1's result moved into the compiled head as evidence; c2 is native.
     assert "results for alpha" in text_of(third[0])
     assert "websearch" in text_of(third[0])
     assert third[1].parts[0].tool_call_id == "c2"
@@ -193,24 +191,21 @@ def test_omitted_evidence_can_be_recalled(tmp_path):
         call("recall", "c4", ids="tool-result-1"),
         answer("done"),
     )
-    # Each result is ~500 tokens: one fits next to the required records, two do not.
     runner, store, processor = make_runner(tmp_path, script, Skills(big), window=1300)
 
     runner.run_task("compare")
 
-    # Step 4 (after send): both results are evidence, only the newest fits.
     head = text_of(script.seen[3][0])
     assert "beta beta" in head
     assert "TOOL_RESULT_OMITTED id=tool-result-1" in head
     recall_result = store.events(1, "tool_result")[3]["result"]
     assert recall_result.startswith("RECALL-QUEUED")
-    # Step 5: the recalled record outranks the newer one.
     head = text_of(script.seen[4][0])
     assert "alpha alpha" in head
 
 
 class Crash(BaseException):
-    """Simulates the process dying mid-task (not caught as a task error)."""
+    """Simulates the process dying mid-task."""
 
 
 def test_interrupted_task_resumes_from_its_last_step(tmp_path):
@@ -225,13 +220,12 @@ def test_interrupted_task_resumes_from_its_last_step(tmp_path):
         runner.run_task("research alpha")
     assert store.interrupted_task().status == RUNNING
 
-    evidence.reset()  # a new process starts with empty memory
+    evidence.reset()
     second_script = Script(call("send", "c3", string="resumed"), answer("done"))
     resumed, _, _ = make_runner(tmp_path, second_script, Skills(), store=store)
 
     assert resumed.resume_interrupted() == "done"
     assert store.task(1).status == DONE
-    # The crashed send step is repeated; the earlier search is not.
     resumed_request = second_script.seen[0]
     assert "results for alpha" in "\n".join(text_of(m) for m in resumed_request)
     assert [e["kind"] for e in store.events(1) if e["kind"] == "resumed"] == ["resumed"]

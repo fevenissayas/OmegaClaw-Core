@@ -1,4 +1,4 @@
-"""Python runtime: skill parsing, MeTTa bridge and event store (no model needed)."""
+"""Tests skill parsing, the MeTTa bridge and the event store."""
 
 import threading
 
@@ -26,7 +26,6 @@ STATIC_SKILLS = [
 ]
 
 
-# harness.skills
 
 
 def test_parse_skill_lines_builds_typed_specs_and_keeps_rules():
@@ -71,7 +70,6 @@ def test_tool_name_and_repeated_params_are_api_safe():
     assert specs[0].params == ("path", "path_2")
 
 
-# harness.metta
 
 
 def test_skill_expression_quotes_and_escapes_arguments():
@@ -152,7 +150,6 @@ def test_skill_lines_reads_get_skills_strings():
     assert MettaBridge(petta).skill_lines() == ["- Send: send string", "rule line"]
 
 
-# harness.store
 
 
 def test_store_tracks_task_lifecycle_and_events(tmp_path):

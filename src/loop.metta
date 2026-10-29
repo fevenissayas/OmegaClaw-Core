@@ -53,7 +53,6 @@
 
 (= (omegaclaw)
    (omegaclaw 1))
-; Startup shared by the MeTTa loop and the Python runtime (harness/).
 (= (omegaclawInit)
    (progn (initConfig)
           (initLoop)

@@ -1,15 +1,4 @@
-"""Dave's context compiler as a PydanticAI history processor.
-
-Before every model request the processor rebuilds the history as
-
-    [compiled request: system prompt, history records, older evidence, task]
-    + [latest tool-call response and its tool returns, unchanged]
-
-Older tool results live in the task evidence store (src/evidence.py), so
-the compiler can rank them against history within the token budget and
-leave omission markers the model can recall by id. The latest step stays
-native so tool calls and their returns remain paired.
-"""
+"""Compiles each model request with Dave's context compiler."""
 
 from dataclasses import dataclass
 import json
@@ -43,7 +32,7 @@ _OPTIONAL_EMPTY_KINDS = {"PROMPT_EXTENSIONS", "OUTPUT_FORMAT"}
 
 @dataclass(frozen=True)
 class PromptSections:
-    """The non-evidence parts of the context, read from MeTTa each step."""
+    """Holds the prompt sections read from MeTTa each step."""
 
     prompt: str
     rules: str
@@ -54,7 +43,7 @@ class PromptSections:
 
 
 class TaskEvidence:
-    """Tool results of the active task, keyed by tool call id."""
+    """Stores the active task's tool results by tool call id."""
 
     def __init__(self, max_chars: int = 50000):
         self._max_chars = int(max_chars)
@@ -76,7 +65,7 @@ class TaskEvidence:
 
 
 class ContextProcessor:
-    """history_processors entry for the runtime's Agent."""
+    """Rebuilds the message history before every model request."""
 
     def __init__(
         self,
@@ -123,7 +112,6 @@ class ContextProcessor:
             if record.text.strip() or record.kind not in _OPTIONAL_EMPTY_KINDS
         )
         tail_tokens = sum(message_tokens(message, self._count) for message in tail)
-        # The first step's turn is the task itself; later steps continue it.
         turn = "" if tail else self.task_message
         try:
             compiled = ContextCompiler(self._count).compile(
@@ -136,9 +124,6 @@ class ContextProcessor:
                 )
             )
         except ContextBudgetError:
-            # The latest step alone leaves no room for the required records:
-            # send prompt and task without history or evidence, and let the
-            # provider decide whether the request still fits.
             logger.exception("[CONTEXT_BUDGET_FAILURE] native_message_tokens=%s", tail_tokens)
             self.last_manifest = None
             head = ModelRequest(
@@ -173,7 +158,7 @@ class ContextProcessor:
 
 
 def latest_tool_step(messages: list[ModelMessage]) -> list[ModelMessage]:
-    """The last response with tool calls and everything after it."""
+    """Returns the last tool-call response and the messages after it."""
     for index in range(len(messages) - 1, -1, -1):
         message = messages[index]
         if isinstance(message, ModelResponse) and any(
@@ -196,8 +181,7 @@ def message_tokens(message: ModelMessage, count_tokens: Callable[[str], int]) ->
 
 
 def command_return(tool_name: str, args: dict, result: str) -> str:
-    """Serialize a tool result the way the MeTTa loop logged it, so the
-    evidence store's source-page detection and labels keep working."""
+    """Serializes a tool result in the MeTTa loop's COMMAND_RETURN format."""
     call = " ".join([tool_name, *(_quoted(value) for value in args.values())])
     return f"(COMMAND_RETURN: (({call}) {_quoted(result)}))"
 

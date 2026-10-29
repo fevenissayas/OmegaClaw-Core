@@ -1,4 +1,4 @@
-"""PydanticAI agent wired to MeTTa skills, task evidence and the event log."""
+"""Builds the PydanticAI agent with MeTTa skill tools."""
 
 from dataclasses import dataclass
 import logging
@@ -34,11 +34,7 @@ def build_agent(
     *,
     max_output_tokens: int,
 ) -> Agent:
-    """Agent with one typed tool per MeTTa skill plus recall.
-
-    execute_skill(name, args) runs a skill and returns a ToolResult; it is
-    the MettaBridge in production and a fake in tests.
-    """
+    """Builds the agent with one tool per skill plus recall."""
     tools = [skill_tool(spec, execute_skill) for spec in skills if spec.name != "recall"]
     tools.append(Tool(recall, takes_ctx=True, name="recall"))
     return Agent(
@@ -46,8 +42,6 @@ def build_agent(
         deps_type=Deps,
         output_type=str,
         tools=tools,
-        # Runs before every model request; the processed history also
-        # replaces the run's stored history (what the runner checkpoints).
         capabilities=[ProcessHistory(processor)],
         model_settings=ModelSettings(max_tokens=int(max_output_tokens)),
     )
@@ -79,8 +73,7 @@ def skill_tool(spec: SkillSpec, execute_skill) -> Tool:
 
 
 def recall(ctx: RunContext[Deps], ids: str) -> str:
-    """Bring task evidence that was left out of context back on the next step,
-    by the exact ids shown in TOOL_RESULT_OMITTED or SOURCE markers, comma separated."""
+    """Bring omitted task evidence back by its comma-separated ids."""
     remaining = max(0, ctx.deps.max_steps - ctx.usage.requests)
     result = ToolResult(True, ctx.deps.processor.recall(ids, remaining))
     return record_result(ctx, "recall", {"ids": ids}, result)

@@ -1,10 +1,4 @@
-"""Task runner: one agent run per user message, checkpointed every step.
-
-Steps run back to back (no fixed sleep between them); only waiting for user
-input polls. The full message history is saved after every graph node, so
-a task interrupted by a crash resumes from its last completed step, with
-its evidence rebuilt from the event log.
-"""
+"""Runs one checkpointed agent task per user message."""
 
 import asyncio
 import logging
@@ -54,7 +48,7 @@ class Runner:
         return asyncio.run(self._run(task_id, message, message, None))
 
     def resume_interrupted(self) -> str | None:
-        """Continue the newest task left running by a crash, if any."""
+        """Continues the newest task left running by a crash."""
         task = self._store.interrupted_task()
         if task is None:
             return None
@@ -64,7 +58,6 @@ class Runner:
             self._evidence.add(event["call_id"], event["name"], event["arguments"], event["result"])
         self._store.record(task.id, "resumed", messages=len(history))
         logger.info("[RESUME] task=%s messages=%s", task.id, len(history))
-        # Without a history the task restarts from its message.
         prompt = None if history else task.message
         return asyncio.run(self._run(task.id, task.message, prompt, history or None))
 
@@ -110,7 +103,7 @@ class Runner:
 
     def serve(self, receive, *, should_stop=lambda: False, poll_seconds=0.2,
               wakeup_seconds=600.0, clock=time.monotonic, sleep=time.sleep):
-        """Run tasks for incoming messages until should_stop() is true."""
+        """Runs a task for each incoming message until should_stop() is true."""
         self.resume_interrupted()
         last_activity = clock()
         while not should_stop():
@@ -126,10 +119,7 @@ class Runner:
 
 
 def resumable_history(history: bytes | None) -> list:
-    """Saved messages up to the last complete step.
-
-    A response whose tool calls never got their returns (the crash happened
-    while tools ran) is dropped, so the model repeats that step."""
+    """Returns saved messages without a trailing unanswered tool call."""
     if not history:
         return []
     messages = list(ModelMessagesTypeAdapter.validate_json(history))

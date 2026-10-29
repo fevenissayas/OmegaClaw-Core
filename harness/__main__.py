@@ -1,11 +1,4 @@
-"""Run OmegaClaw with the Python runtime: python -m harness [key=value ...]
-
-PeTTa loads lib_omegaclaw and runs (omegaclawInit) (config, memory,
-plugins, channels), then the Python runner owns the loop: it receives
-messages through the MeTTa channel layer and runs MeTTa skills as tools.
-key=value arguments become OMEGA_<key> environment variables, the same
-override config_get_by_key already reads.
-"""
+"""Boots PeTTa and runs OmegaClaw with the Python runtime."""
 
 import logging
 import os
@@ -121,12 +114,12 @@ def main(argv: list[str]) -> int:
 
 
 def build_model(config_get_by_key):
-    """OpenAI-compatible chat model: OpenAI, OpenRouter, ASI Cloud, local servers."""
+    """Builds an OpenAI-compatible chat model from the config."""
     from pydantic_ai.providers.openai import OpenAIProvider
 
     try:
         from pydantic_ai.models.openai import OpenAIChatModel as ChatModel
-    except ImportError:  # pydantic-ai before 1.0
+    except ImportError:
         from pydantic_ai.models.openai import OpenAIModel as ChatModel
 
     api_key = os.environ.get(str(config_get_by_key("harnessApiKeyEnv", "OPENAI_API_KEY")))
